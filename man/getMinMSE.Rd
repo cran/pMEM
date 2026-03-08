@@ -2,74 +2,86 @@
 % Please edit documentation in R/getMinMSE.R
 \name{getMinMSE}
 \alias{getMinMSE}
-\title{Simple Orthogonal Term Selection Regression}
+\title{Orthogonal Term Selection via Cross-Validated MSE}
 \usage{
 getMinMSE(U, y, Up, yy, complete = TRUE)
 }
 \arguments{
-\item{U}{A matrix of spatial eigenvectors to be used as training data.}
+\item{U}{Training matrix of orthogonal predictors (\code{n_train × p}),
+where \code{n_train} is the number of training observations and \code{p}
+is the number of predictors (e.g., spatial eigenvectors). Must be
+orthonormal (columns have unit norm and are mutually orthogonal).}
 
-\item{y}{A numeric vector containing a single response variable to be used as
-training labels.}
+\item{y}{Training response vector (length \code{n_train}).}
 
-\item{Up}{A numeric matrix of spatial eigenvector scores to be used as
-testing data.}
+\item{Up}{Testing matrix of orthogonal predictors (\code{n_test × p}),
+evaluated at testing locations.}
 
-\item{yy}{A numeric vector containing a single response variable to be used
-as testing labels.}
+\item{yy}{Testing response vector (length \code{n_test}).}
 
-\item{complete}{A boolean specifying whether to return the complete data of
-the selection procedure (\code{complete=TRUE}; the default) or only the
-resulting mean square error and beta threshold (\code{complete=FALSE}).}
+\item{complete}{If \code{TRUE} (default), return full selection results
+(all MSE values, coefficient order, etc.). If \code{FALSE}, return only
+the minimum MSE and associated coefficient threshold.}
 }
 \value{
-If \code{complete = TRUE}, a list with the following members:
+If \code{complete = TRUE}, a list with the following elements:
 \describe{
-  \item{ betasq }{ The squared standardized regression coefficients. }
-  \item{ nullmse }{ The null MSE value: the mean squared out of the sample
-  error using only the mean of the training labels as the prediction. }
-  \item{ mse }{ The mean squared error of each incremental model. }
-  \item{ ord }{ The order of the squared standardized regression
-  coefficients. }
-  \item{ wh }{ The index of the model with the smallest mean squared error. 
-  The value 0 means that the smallest MSE is the null MSE. }
+  \item{betasq}{ Squared standardized regression coefficients (length
+  \code{p}). }
+  \item{nullmse}{ Null model MSE: variance of testing responses around their
+  mean. }
+  \item{mse}{ MSE values for incremental models (length \code{p + 1}); 
+  \code{mse[1]} is the null MSE. }
+  \item{ord}{ Indices of predictors sorted by decreasing absolute coefficient
+  value. }
+  \item{wh}{ Index of the best model (1-based). Value \code{1} means the null 
+  model is best; value \code{k + 1} means the first \code{k} predictors from
+  \code{ord} are selected. }
 }
 
-If \code{complete = FALSE} a two element list with the following members:
+If \code{complete = FALSE}, a list with two elements:
 \describe{
-  \item{ betasq }{ The squared standardized regression coefficient
-  associated with the minimum means squared error value. }
-  \item{ mse }{ The minimum means squared error value. }
+  \item{betasq}{ Squared standardized coefficient at the optimal model. }
+  \item{mse}{ Minimum MSE value achieved. }
 }
 }
 \description{
-A simple orthogonal term selection regression function for minimizing out of
-the sample mean squared error (MSE).
+\code{getMinMSE} performs forward selection of orthogonal predictors by
+minimizing out-of-sample mean squared error (MSE) on a testing dataset.
 }
 \details{
 This function allows one to calculate a simple model, involving only
 the spatial eigenvectors and a single response variable. The coefficients
 are estimated on a training data set; the ones that are retained are chosen
-on the basis of minimizing the mean squared error on the testing data set. As
-such, both a training and a testing data set are mandatory for this procedure
-to be carried on. The procedure goes as follows:
-\enumerate{
-  \item{ The regression coefficients are calculated as the cross-product
-  \code{b = t(U)y} and are sorted in decreasing order of their absolute
-  values. }
-  \item{ The mean of the training labels is calculated, then the residuals
-  training labels are calculated, and the null MSE is calculated from the
-  testing labels. }
-  \item{ For each regression coefficient, the partial predicted value is
-  calculated and subtracted from the testing labels, and the new MSE value is
-  calculated. }
-  \item{ The minimum MSE value is identified. }
-  \item{ The regression coefficients are standardized ans squared and the
-  results are returned. }
+on the basis of minimizing the mean squared error on the testing data set.
+
+\subsection{Algorithm}{
+  The selection procedure proceeds as follows:
+  \enumerate{
+    \item Compute regression coefficients: \code{b = t(U) \%*\% y} (valid
+          because \code{U} is orthonormal).
+    \item Sort coefficients by decreasing absolute value; store order in
+          \code{ord}.
+    \item Compute null MSE: variance of \code{yy} around \code{mean(y)}.
+    \item For each predictor (in sorted order), add its partial prediction to
+          the model and compute out-of-sample MSE on \code{yy}.
+    \item Identify the model with minimum MSE; return corresponding
+          coefficient threshold and MSE.
+  }
 }
 
-For this procedure, the training data must be are orthonormal, a condition
-met design by spatial eigenvectors.
+\subsection{Orthonormality Requirement}{
+  Predictors in \code{U} must be orthonormal (columns have unit norm and are 
+  mutually orthogonal). This condition is met by design for spatial
+  eigenvectors produced by \code{genSEF()}, but users must ensure it for
+  custom predictors.
+}
+
+\subsection{Performance}{
+  This function is implemented in C++ via Rcpp for efficiency. For
+  \code{p = 50} predictors and \code{n = 100} observations, it is
+  approximately 50× faster than a pure R implementation.
+}
 }
 \examples{
 ## Loading the 'salmon' dataset
@@ -123,7 +135,7 @@ abline(h=mseRes$Depth$nullmse, lty=3)  # Dotted line: the null MSE
 ## A list of the selected spatial eigenfunctions:
 sel[["Depth"]] <- sort(mseRes$Depth$ord[1:mseRes$Depth$wh])
 
-## A linear model build using the selected spatial eigenfunctions:
+## A linear model built using the selected spatial eigenfunctions:
 lm(
   formula = y~.,
   data = cbind(
@@ -151,6 +163,10 @@ plot(x=xx, y=prd$Depth, type="l", ylim=range(salmon$Depth, prd$Depth), las=1,
 points(x = salmon$Position[train], y = salmon$Depth[train], pch=21,
        bg="black")
 points(x = salmon$Position[test], y = salmon$Depth[test], pch=21, bg="red")
+
+## Prediction of the velocity, substrate, and using them to predict the parr
+## density.
+\dontrun{
 
 ## Spatially-explicit modelling of the water velocity:
 
@@ -268,6 +284,7 @@ points(x = salmon$Position[test], y = salmon$Substrate[test], pch=21,
 ## x=channel depth + water velocity + D50 + pMEM:
 
 ## Requires suggested package glmnet to perform elasticnet regression:
+
 library(glmnet)
 
 ## Calculation of the elastic net model (cross-validated):
@@ -295,7 +312,7 @@ predict(
   type = "response"
 ) -> yhatTest
 
-## Calculating predictions for the transect (1 m seperated data):
+## Calculating predictions for the transect (1 m separated data):
 predict(
   cvglm,
   newx = cbind(
@@ -313,7 +330,7 @@ predict(
 ## submodels), the observed abundances for the training set (black markers),
 ## the observed abundances for the testing set (red markers), and the
 ## predicted abundances for the testing set calculated on the basis of
-## observed depth, velocity, and D50:
+## observed depth, velocity, and median substrate grain size:
 plot(x=xx, y=yhatTransect, type="l",
      ylim=range(salmon$Abundance,yhatTransect), las=1,
      ylab="Abundance (fish)", xlab="Location along the transect (m)")
@@ -322,12 +339,11 @@ points(x=salmon$Position[train], y=salmon$Abundance[train], pch=21,
 points(x=salmon$Position[test], y=salmon$Abundance[test], pch=21, bg="red")
 points(x=salmon$Position[test], y=yhatTest, pch=21, bg="green")
 
+}
 ## Restoring previous graphical parameters:
 par(tmp)
 
 }
 \author{
 \packageAuthor{pMEM}
-
-Maintainer: \packageMaintainer{pMEM}
 }

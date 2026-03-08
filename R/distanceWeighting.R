@@ -1,6 +1,6 @@
 ## **************************************************************************
 ##
-##    (c) 2023-2024 Guillaume Guénard
+##    (c) 2023-2026 Guillaume Guénard
 ##        Department de sciences biologiques,
 ##        Université de Montréal
 ##        Montreal, QC, Canada
@@ -26,220 +26,76 @@
 ##
 ## **************************************************************************
 ##
-#' Distance Weighting Function Generator
+#' Generate a Distance Weighting Function
 #' 
-#' Function \code{genDWF} generates a distance weighting function on the basis
-#' of given arguments.
+#' \code{genDWF} returns a function that transforms pairwise distances into
+#' spatial weights, with support for both real and complex-valued distances.
 #' 
-#' @param fun The function describing the kind of distance weighting: one of
-#' 'linear', 'power', 'hyperbolic', 'spherical', 'exponential',
-#' 'Gaussian', 'hole_effect', or an unambiguous abbreviation of one of them.
-#' @param range A single numeric value giving the range of the distance
-#' weighting function (see details).
-#' @param shape A single (numeric) shape parameter used by functions
-#' 'power' or 'hyperbolic' (ignored by the other functions).
+#' @param fun Distance weighting function type. One of \code{"linear"},
+#'   \code{"power"}, \code{"hyperbolic"}, \code{"spherical"},
+#'   \code{"exponential"}, \code{"Gaussian"}, or \code{"hole_effect"}. Partial
+#'   matching is supported (e.g., \code{"exp"} for \code{"exponential"}).
+#' @param range Range parameter (positive numeric). For \code{"linear"},
+#'   \code{"power"}, \code{"hyperbolic"}, and \code{"spherical"}, this is the
+#'   distance beyond which weights equal 0. For \code{"exponential"},
+#'   \code{"Gaussian"}, and \code{"hole_effect"}, this is the scale parameter
+#'   controlling decay rate.
+#' @param shape Shape parameter (positive numeric). Used only for \code{"power"}
+#'   and \code{"hyperbolic"} functions; ignored otherwise. Default is \code{1}.
 #' 
-#' @returns A single-argument function (\code{d}) transforming the distances
-#' into weights. This function returns a matrix when the distances are provided
-#' as a matrix and a numeric vector when the distances are provided as a numeric
-#' vector.
+#' @returns A function with signature \code{function(d)} that transforms
+#' distances into weights. Returns a numeric vector for vector input, or a
+#' numeric/complex matrix for matrix input. For complex-valued distances (from
+#' asymmetric metrics), returns complex-valued weights.
 #' 
-#' @details All distance weighting function return the value 1 (or 1+0i) for a
-#' distance or 0 (or 0+0i). For functions 'linear', 'power', 'hyperbolic', and
-#' 'spherical', argument \code{range} corresponds to the distance above which
-#' weights have a constant value of 0 (or 0+0i). Functions 'exponential',
-#' 'Gaussian', and 'hole_effect' have no definite value beyond \code{d > range},
-#' but collapse asymptotically toward 0 either monotonically ('exponential' and
-#' 'Gaussian'), or following dampened oscillations about the value 0
-#' ('hole_effect').
+#' @details All functions return 1 (or 1+0i) at distance 0. Behavior beyond
+#' varies.
+#' 
+#' \subsection{Complex-Valued Distances}{
+#'   When distances are complex (from asymmetric metrics via
+#'   \code{genDistMetric(delta)}), the weighting functions operate on the
+#'   modulus while preserving phase information. This enables directional
+#'   spatial modeling for transects or flow-influenced systems.
+#' }
+#' 
+#' \subsection{Function Generator Pattern}{
+#'   \code{genDWF} returns a closure embedding \code{fun}, \code{range}, and
+#'   \code{shape} in its environment. To change parameters, call
+#'   \code{genDWF} again with new arguments.
+#' }
 #' 
 #' @author \packageAuthor{pMEM}
 #' 
-#' @examples  ## Show examples of distance weighting functions (real-valued)
-#' 
-#' ## Custom display function for this example (real-values):
-#' plotDWF <- function(d, w, label, ylim = c(0,1)) {
-#'   plot(x = d, y = w[,1L], type = "l", ylim = ylim, las = 1L,
-#'        xlab = "Distance", ylab = "", cex.axis = 2, cex.lab=2, lwd = 2)
-#'   lines(x = d, y = w[,2L], col = "red", lwd = 2)
-#'   lines(x = d, y = w[,3L], col = "blue", lwd = 2)
-#'   text(x = 2.5, y = 0.8, label = label, adj = 0, cex = 2)
-#' }
-#' 
+#' @examples
 #' ## A set of distances from which to show the corresponding weights:
-#' d <- seq(0,5,0.001)
+#' d <- seq(0, 5, 0.1)
 #' 
-#' ## Graphical parameters for all the figures:
-#' tmp <- par(no.readonly = TRUE)
-#' par(mar=c(5.1,5.1,0.6,0.6))
-#' 
-#' ## Shapes of the seven distance weighting functions implemented in this
-#' ## package for real-valued distances.
-#' 
-#' ## The linear function:
-#' 
-#' cbind(
+#' ## The linear function with different ranges:
+#' w <- cbind(
 #'   genDWF(fun = "linear", range = 1)(d),
 #'   genDWF(fun = "linear", range = 0.5)(d),
 #'   genDWF(fun = "linear", range = 2)(d)
-#' ) -> w
-#' 
-#' plotDWF(d, w, label="Linear")
-#' 
-#' ## The power function:
-#' 
-#' cbind(
-#'   genDWF(fun = "power", range = 1, shape = 1)(d),
-#'   genDWF(fun = "power", range = 2, shape = 0.5)(d),
-#'   genDWF(fun = "power", range = 3, shape = 0.5)(d)
-#' ) -> w
-#' 
-#' plotDWF(d, w, label="Power")
-#' 
-#' ## The hyperbolic function:
-#' 
-#' cbind(
-#'   genDWF(fun = "hyperbolic", range = 1, shape = 1)(d),
-#'   genDWF(fun = "hyperbolic", range = 2, shape = 0.5)(d),
-#'   genDWF(fun = "hyperbolic", range = 0.5, shape = 2)(d)
-#' ) -> w
-#' 
-#' plotDWF(d, w, label="Hyperbolic")
-#' 
-#' ## The spherical function:
-#' 
-#' cbind(
-#'   genDWF(fun = "spherical", range = 1)(d),
-#'   genDWF(fun = "spherical", range = 0.5)(d),
-#'   genDWF(fun = "spherical", range = 2)(d)
-#' ) -> w
-#' 
-#' plotDWF(d, w, label="Spherical")
+#' )
+#' dim(w)  # 51 × 3 matrix
+#' #> [1] 51    3
 #' 
 #' ## The exponential function:
+#' w <- genDWF(fun = "exponential", range = 1)(d)
+#' w[1:5]  # First 5 weights (starts at 1, decays)
+#' #> [1] 1.0000000 0.9048374 0.8187308 0.7408182 0.6703200
 #' 
-#' cbind(
-#'   genDWF(fun = "exponential", range = 1)(d),
-#'   genDWF(fun = "exponential", range = 0.5)(d),
-#'   genDWF(fun = "exponential", range = 2)(d)
-#' ) -> w
+#' ## The hole_effect function (can go negative):
+#' w <- genDWF(fun = "hole_effect", range = 1)(d)
+#' range(w)  # Includes negative values
+#' #> [1] -0.2162362  1.0000000
 #' 
-#' plotDWF(d, w, label="Exponential")
-#' 
-#' ## The Gaussian function:
-#' 
-#' cbind(
-#'   genDWF(fun = "Gaussian", range = 1)(d),
-#'   genDWF(fun = "Gaussian", range = 0.5)(d),
-#'   genDWF(fun = "Gaussian", range = 2)(d)
-#' ) -> w
-#' 
-#' plotDWF(d, w, label="Gaussian")
-#' 
-#' ## The "hole effect" (cardinal sine) function:
-#' 
-#' cbind(
-#'   genDWF(fun = "hole_effect", range = 1)(d),
-#'   genDWF(fun = "hole_effect", range = 0.5)(d),
-#'   genDWF(fun = "hole_effect", range = 2)(d)
-#' ) -> w
-#' 
-#' plotDWF(d, w, label="Hole effect", ylim=c(-0.2,1))
-#' 
-#' 
-#' ## Custom display function for this example (complex-values):
-#' plotDWFcplx <- function(d, w, label, ylim) {
-#'   plot(x = Mod(d), y = Re(w[,1L]), type = "l", ylim = ylim, las = 1L,
-#'   xlab = "Distance", ylab = "", cex.axis = 2, cex.lab=2, lwd = 2, lty = 2L)
-#'   lines(x = Mod(d), y = Im(w[,1L]), lwd = 2, lty=3L)
-#'   lines(x = Mod(d), y = Re(w[,2L]), col = "red", lwd = 2, lty = 2L)
-#'   lines(x = Mod(d), y = Im(w[,2L]), col = "red", lwd = 2, lty = 3L)
-#'   lines(x = Mod(d), y = Re(w[,3L]), col = "blue", lwd = 2, lty = 2L)
-#'   lines(x = Mod(d), y = Im(w[,3L]), col = "blue", lwd = 2, lty = 3L)
-#'   text(x = 2.5, y = 0.8, label = label, adj = 0, cex = 2)
-#'   invisible(NULL)
-#' }
-#' 
-#' ## Generated the asymmetric distance metrics for a one-dimensional transect
-#' ## and a delta of pi/8 (0.39...):
-#' dd <- complex(modulus=seq(0,5,0.001), argument = pi/8)
-#' 
-#' ## Shapes of the seven distance weighting functions implemented in this
-#' ## package for complex-valued distances.
-#' 
-#' ## The linear function:
-#' 
-#' cbind(
-#'   genDWF(fun = "linear", range = 1)(dd),
-#'   genDWF(fun = "linear", range = 0.5)(dd),
-#'   genDWF(fun = "linear", range = 2)(dd)
-#' ) -> ww
-#' 
-#' plotDWFcplx(dd, ww, label="Linear", ylim=c(-0.4,1))
-#' 
-#' ## The power function:
-#' 
-#' cbind(
-#'   genDWF(fun = "power", range = 1, shape = 1)(dd),
-#'   genDWF(fun = "power", range = 2, shape = 0.5)(dd),
-#'   genDWF(fun = "power", range = 3, shape = 0.5)(dd)
-#' ) -> ww
-#' 
-#' plotDWFcplx(dd, ww, label="Power", ylim=c(-0.4,1))
-#' 
-#' ## The hyperbolic down function:
-#' 
-#' cbind(
-#'   genDWF(fun = "hyperbolic", range = 1, shape = 1)(dd),
-#'   genDWF(fun = "hyperbolic", range = 2, shape = 0.5)(dd),
-#'   genDWF(fun = "hyperbolic", range = 0.5, shape = 2)(dd)
-#' ) -> ww
-#' 
-#' plotDWFcplx(dd, ww, label="Hyperbolic", ylim=c(-0.4,1))
-#' 
-#' ## The spherical function:
-#' 
-#' cbind(
-#'   genDWF(fun = "spherical", range = 1)(dd),
-#'   genDWF(fun = "spherical", range = 0.5)(dd),
-#'   genDWF(fun = "spherical", range = 2)(dd)
-#' ) -> ww
-#' 
-#' plotDWFcplx(dd, ww, label="Spherical", ylim=c(-0.4,1))
-#' 
-#' ## The exponential function:
-#' 
-#' cbind(
-#'   genDWF(fun = "exponential", range = 1)(dd),
-#'   genDWF(fun = "exponential", range = 0.5)(dd),
-#'   genDWF(fun = "exponential", range = 2)(dd)
-#' ) -> ww
-#' 
-#' plotDWFcplx(dd, ww, label="Exponential", ylim=c(-0.4,1))
-#' 
-#' ## The Gaussian function:
-#' 
-#' cbind(
-#'   genDWF(fun = "Gaussian", range = 1)(dd),
-#'   genDWF(fun = "Gaussian", range = 0.5)(dd),
-#'   genDWF(fun = "Gaussian", range = 2)(dd)
-#' ) -> ww
-#' 
-#' plotDWFcplx(dd, ww, label="Gaussian", ylim=c(-0.4,1))
-#' 
-#' ## The "hole effect" (cardinal sine) function:
-#' 
-#' cbind(
-#'   genDWF(fun = "hole_effect", range = 1)(dd),
-#'   genDWF(fun = "hole_effect", range = 0.5)(dd),
-#'   genDWF(fun = "hole_effect", range = 2)(dd)
-#' ) -> ww
-#' 
-#' plotDWFcplx(dd, ww, label="Hole effect", ylim=c(-0.3,1.1))
-#' 
-#' ## Restore previous graphical parameters:
-#' par(tmp)
-#' 
+#' ## Complex-valued distances (asymmetric metrics) with a delta of pi/8:
+#' d <- complex(modulus = seq(0, 5, 0.1), argument = pi/8)
+#' w <- genDWF(fun = "Gaussian", range = 1)(d)
+#' Mod(w[1:5])  # Modulus of complex weights
+#' #> 1.0000000 0.9929539 0.9721120 0.9383431 0.8930282
+#' Arg(w[1:5])  # Phase preserved from input distances
+#' #> 0.000000000 -0.007071068 -0.028284271 -0.063639610 -0.113137085
 #' 
 #' @importFrom Rcpp evalCpp
 #' 

@@ -1,6 +1,6 @@
 /***************************************************************************\
  *
- * (c) 2023-2024 Guillaume Guénard
+ * (c) 2023-2026 Guillaume Guénard
  *     Department de sciences biologiques,
  *     Université de Montréal
  *     Montreal, QC, Canada
@@ -32,7 +32,11 @@ NumericMatrix EuclidReal(const NumericMatrix& x, const NumericMatrix& y) {
   List dmy = y.attr("dimnames");
   List dmx = x.attr("dimnames");
   NumericMatrix out(ny, nx);
-  out.attr("dimnames") = List::create(dmy[0], dmx[0]);
+  if(dmy.size() > 0 || dmx.size() > 0)
+    out.attr("dimnames") = List::create(
+      (dmy.size() > 0) ? dmy[0] : R_NilValue,
+      (dmx.size() > 0) ? dmx[0] : R_NilValue
+    );
   
   if(nc > 1)
     for(i = 0; i < ny; i++)
@@ -70,7 +74,11 @@ ComplexMatrix EuclidCplx2D(const NumericMatrix& x, const NumericMatrix& y,
   List dmy = y.attr("dimnames");
   List dmx = x.attr("dimnames");
   ComplexMatrix out(ny, nx);
-  out.attr("dimnames") = List::create(dmy[0], dmx[0]);
+  if(dmy.size() > 0 || dmx.size() > 0)
+    out.attr("dimnames") = List::create(
+      (dmy.size() > 0) ? dmy[0] : R_NilValue,
+      (dmx.size() > 0) ? dmx[0] : R_NilValue
+    );
   
   if(nc > 1)
     for(i = 0; i < ny; i++)

@@ -26,138 +26,187 @@
 ##
 ## **************************************************************************
 ##
-#' Class and Methods for Predictive Moran's Eigenvector Maps (pMEM)
+#' SEMap: Spatial EigenMap Class for Predictive Moran's Eigenvector Maps
 #' 
-#' Generator function, class, and methods to handle predictive Moran's
-#' eigenvector maps (pMEM).
+#' \code{SEMap} objects store spatial eigenfunctions derived from distance-based
+#' weighting matrices, enabling spatially-explicit prediction at sampled and
+#' unsampled locations.
 #' 
 #' @docType class
 #' 
 #' @name SEMap-class
 #' 
-#' @aliases pMEM
+#' @aliases SEMap genSEF print.SEMap as.data.frame.SEMap as.matrix.SEMap
+#' predict.SEMap
 #' 
-#' @param x a set of coordinates to be given to the distance metric function
-#' (argument \code{m} below) to obtain the distance metric (\code{genSEF}) or an
-#' \code{SEMap-class} object (methods).
-#' @param m a distance metric function, such as one of those returned by
-#' \code{\link{genDistMetric}}.
-#' @param f a distance weighting function, such as one of those returned by
-#' \code{\link{genDWF}}.
-#' @param tol a tolerance threshold for absolute eigenvalues, below which to
-#' discard spatial eigenfunctions.
-#' @param object an \code{SEMap-class} object.
-#' @param ... further arguments to be passed to other functions or methods.
-#' @param row.names \code{NULL} or a character vector giving the row names for
-#' the data frame. Missing values are not allowed.
-#' @param optional logical. If \code{TRUE}, setting row names and converting
-#' column names (to syntactic names: see \code{\link{make.names}}) is optional.
-#' See \bold{base} \code{\link{as.data.frame}} for further details on this
-#' argument.
-#' @param newdata a set of new coordinates from which to calculate pMEM
-#' predictor scores.
+#' @param x For \code{genSEF}: a numeric matrix or vector of coordinates
+#'   (\code{n × d}, where \code{n} is number of sites and \code{d} is dimensions).
+#'   For methods: an \code{SEMap}-class object.
+#' @param m A distance metric function (e.g., from \code{\link{genDistMetric}}).
+#'   Must accept two arguments (\code{x}, \code{y}) and return a numeric or
+#'   complex matrix of pairwise distances.
+#' @param f A distance weighting function (e.g., from \code{\link{genDWF}}).
+#'   Must accept one argument (distances) and return weights of the same type.
+#' @param tol Tolerance threshold (positive numeric). Eigenvectors with absolute
+#'   eigenvalues below this value are discarded. Default is
+#'   \code{.Machine$double.eps^0.5} (~1e-8).
+#' @param object An \code{SEMap}-class object (for methods).
+#' @param newdata A numeric matrix or vector of coordinates for prediction
+#'   (\code{n_new × d}).
+#' @param ... Additional arguments passed to methods (e.g., \code{wh} for
+#'   selecting specific eigenvectors).
+#' @param row.names,optional Passed to \code{as.data.frame}; see
+#'   \code{\link[base]{as.data.frame}} for details.
 #' 
-#' @return
+#' @return 
 #' \describe{
-#'   \item{ genSEF }{ a \code{SEMap-class} object. }
-#'   \item{ print.SEMap }{ \code{NULL} (invisibly). }
-#'   \item{ as.data.frame.SEMap }{ A \code{data.frame} with the spatial
-#'   eigenvectors. }
-#'   \item{ as.matrix.SEMap }{ A matrix with the spatial eigenvectors. }
-#'   \item{ predict.SEMap }{ A matrix with the spatial eigenfunction values }
+#'   \item{\code{genSEF}}{ An \code{SEMap}-class object containing
+#'         eigenfunctions, eigenvalues, and prediction methods. }
+#'   \item{\code{print.SEMap}}{ \code{NULL} (invisibly); prints summary to
+#'         console. }
+#'   \item{\code{as.data.frame.SEMap}}{ A \code{data.frame} with eigenvectors as
+#'         columns. }
+#'   \item{\code{as.matrix.SEMap}}{ A numeric/complex matrix of eigenvectors. }
+#'   \item{\code{predict.SEMap}}{ A matrix of eigenfunction scores at
+#'         \code{newdata} locations (\code{n_new × k}, where \code{k} is the
+#'         number of eigenvectors). }
 #' }
 #' 
-#' @details Predictive Moran's Eigenvector Maps (pMEM) allows one to model the
-#' spatial variability of an environmental variable and use the resulting model
-#' for making prediction at any location on and around the sampling points. They
-#' originate from coordinates in one or more dimensions, which are used to
-#' calculate distances. The distances are obtained from the coordinates using a
-#' function given through argument \code{m} (see \code{\link{genDistMetric}} for
-#' further details). The distances are then transformed to weights using a
-#' spatial weighting function given as argument \code{f} (see
-#' \code{\link{genDWF}} for implementations of spatial weighting function). The
-#' resulting weights are row- and column-centred to the value 0 before being
-#' submitted to an eigenvalue decomposition. Eigenvectors associated to
-#' eigenvalues whose absolute value are above the threshold value set through
-#' argument \code{tol} are retained as part of the resulting eigenvector map.
+#' @details
 #' 
-#' In a standard workflow, a model is built for the locations where values of
-#' the response variable are known using the eigenvectors (or a subset thereof).
-#' This model may be build using any model building approach using descriptors.
-#' The scores obtained for new coordinates from method \code{predict} are used
-#' given to the model for making predictions.
+#' Predictive Moran's Eigenvector Maps (pMEM) allows one to model the spatial
+#' variability of an environmental variable and use the resulting model for
+#' making prediction at any location on and around the sampling points.
 #' 
-#' The function can handle real-valued as well as complex-valued distance
-#' metrics. The latter is useful to represent asymmetric (i.e., directed)
-#' spatial processes.
+#' \subsection{Algorithm}{
+#'   pMEM eigenfunctions are computed as follows:
+#'   \enumerate{
+#'     \item Compute pairwise distances from coordinates using \code{m(x, x)}.
+#'     \item Transform distances to weights using \code{f(d)}.
+#'     \item Double-center the weight matrix (row and column means subtracted).
+#'     \item Perform eigenvalue decomposition on the centered matrix.
+#'     \item Retain eigenvectors with absolute eigenvalues above \code{tol}.
+#'   }
+#' }
 #' 
-#' @format A \code{SEMap-class} object contains:
+#' \subsection{Prediction at New Locations}{
+#'   The \code{predict} method calculates eigenfunction scores at unsampled
+#'   locations by:
+#'   \enumerate{
+#'     \item Computing distances from training sites to new locations.
+#'     \item Transforming to weights and re-centering using training site
+#'           centers.
+#'     \item Projecting onto the eigenvector basis via matrix multiplication.
+#'   }
+#' }
+#' 
+#' \subsection{Complex-Valued Eigenfunctions}{
+#'   When using asymmetric distance metrics (via \code{genDistMetric(delta)}),
+#'   eigenfunctions are complex-valued. The real and imaginary parts represent
+#'   directional spatial patterns (e.g., upstream vs. downstream in rivers).
+#' }
+#' 
+#' \subsection{Modeling Workflow}{
+#'   Standard workflow:
+#'   \enumerate{
+#'     \item Generate \code{SEMap} object with \code{genSEF()}.
+#'     \item Extract eigenvectors with \code{as.matrix()} or
+#'           \code{as.data.frame()}.
+#'     \item Select optimal subset using \code{\link{getMinMSE}} or other
+#'           criteria.
+#'     \item Fit model (e.g., \code{lm()}, \code{glm()}) with selected
+#'           eigenvectors.
+#'     \item Predict at new locations using \code{predict(SEMap, newdata)}.
+#'   }
+#' }
+#' 
+#' @format An \code{SEMap}-class object is a list with class attribute
+#'   \code{"SEMap"} containing the following components:
 #' \describe{
-#'   \item{ show }{ A printing function. }
-#'   \item{ getIMoran }{ A function (with no argument) returning the Moran's I
-#'   coefficients associated with the spatial eigenfunctions. }
-#'   \item{ getSEF }{ A function that return the spatial eigenvectors. It has an
-#'   argument \code{wh} which allows one to specify a selection of the
-#'   eigenvectors that are to be returned. }
-#'   \item{ getLambda }{ A function that returns the eigenvalues. }
-#'   \item{ getPredictor }{ A function that calculate the spatial eigenfunction
-#'   values for arbitrary locations about the sampling points. The coordinates
-#'   of these locations are given as a vector or matrix through argument
-#'   \code{xx}. It also has an argument \code{wh} which allows one to specify a
-#'   selection of the eigenfunctions that are to be returned. }
+#'   \item{\code{show}}{ Function to print object summary. }
+#'   \item{\code{getIMoran}}{ Function returning Moran's I coefficients for each
+#'         eigenfunction. }
+#'   \item{\code{getSEF}}{ Function returning eigenvectors; accepts \code{wh}
+#'         argument to select specific columns. }
+#'   \item{\code{getLambda}}{ Function returning eigenvalues. }
+#'   \item{\code{getPredictor}}{ Function computing eigenfunction scores at new
+#'         locations; accepts \code{xx} (coordinates) and \code{wh} (selection). }
 #' }
 #' 
 #' @author \packageAuthor{pMEM}
 #' 
-#' Maintainer: \packageMaintainer{pMEM}
-#' 
 #' @importFrom utils head tail
 #' 
-#' @examples ## Store graphical parameters:
-#' tmp <- par(no.readonly = TRUE)
-#' par(las=1)
+#' @examples
 #' 
 #' ## Case 1: one-dimensional symmetrical
 #' 
 #' n <- 11
 #' x <- (n - 1)*seq(0, 1, length.out=n)
+#' 
+#' ## Store graphical parameters:
+#' tmp <- par(no.readonly = TRUE)
+#' par(las=1)
+#' 
+#' sef <- genSEF(x, genDistMetric(), genDWF("Gaussian",3))
+#' sef
+#' #> A SEMap-class object
+#' #> --------------------
+#' #> Number of sites: 11
+#' #> Directional: no
+#' #> Number of components: 10
+#' #> Eigenvalues: 3.28700,1.98782,0.79880,...,0.00005,0.00000
+#' #> --------------------
+#' 
+#' ## Extract eigenvectors:
+#' dim(as.matrix(sef))  # 11 × 10 matrix
+#' #> [1] 11 10
+#' 
+#' ## Predict at new locations:
 #' xx <- (n - 1)*seq(0, 1, 0.01)
+#' pred <- predict(sef, xx, wh=1:3)
+#' dim(pred)  # 101 × 3 matrix
+#' #> [1] 101   3
 #' 
-#' sefSym <- genSEF(x, genDistMetric(), genDWF("Gaussian",3))
+#' ## Quick plot of the first eigenfunction:
+#' if(interactive()) {
+#'   plot(xx, pred[, 1], type="l", xlab="Position", ylab="pMEM_1")
+#'   points(x, as.matrix(sef)[, 1], pch=21, bg="black")
+#' }
 #' 
-#' plot(y = predict(sefSym, xx, wh=1), x = xx, type = "l", ylab = "PMEM_1",
-#'      xlab = "x")
-#' points(y = as.matrix(sefSym, wh=1), x = x)
+#' \dontrun{
 #' 
-#' plot(y = predict(sefSym, xx, wh=2), x = xx, type = "l", ylab = "PMEM_2",
-#'      xlab = "x")
-#' points(y = as.matrix(sefSym, wh=2), x = x)
+#' ## The Second eigenfunction:
+#' plot(y = predict(sef, xx, wh=2), x=xx, type="l", ylab="PMEM_2", xlab="x")
+#' points(y=as.matrix(sef, wh=2), x=x)
 #' 
-#' plot(y = predict(sefSym, xx, wh=5), x = xx, type = "l", ylab = "PMEM_5",
-#'      xlab = "x")
-#' points(y = as.matrix(sefSym, wh=5), x = x)
+#' plot(y=predict(sef, xx, wh=5), x=xx, type="l", ylab="PMEM_5", xlab="x")
+#' points(y=as.matrix(sef, wh=5), x=x)
 #' 
 #' ## Case 2: one-dimensional asymmetrical (each has a real and imaginary parts)
 #' 
-#' sefAsy <- genSEF(x, genDistMetric(delta = pi/8), genDWF("Gaussian",3))
+#' sef <- genSEF(x, genDistMetric(delta=pi/8), genDWF("Gaussian",3))
 #' 
-#' plot(y = Re(predict(sefAsy, xx, wh=1)), x = xx, type = "l", ylab = "PMEM_1",
-#'      xlab = "x", ylim=c(-0.35,0.35))
-#' lines(y = Im(predict(sefAsy, xx, wh=1)), x = xx, col="red")
-#' points(y = Re(as.matrix(sefAsy, wh=1)), x = x)
-#' points(y = Im(as.matrix(sefAsy, wh=1)), x = x, col="red")
+#' ## First asymmetric eigenfunction:
+#' plot(y = Re(predict(sef, xx, wh=1)), x=xx, type="l", ylab="PMEM_1", xlab="x",
+#'      ylim=c(-0.35,0.35))
+#' lines(y = Im(predict(sef, xx, wh=1)), x=xx, col="red")
+#' points(y=Re(as.matrix(sef, wh=1)), x=x)
+#' points(y=Im(as.matrix(sef, wh=1)), x=x, col="red")
 #' 
-#' plot(y = Re(predict(sefAsy, xx, wh=2)), x = xx, type = "l", ylab = "PMEM_2",
-#'      xlab = "x", ylim=c(-0.45,0.35))
-#' lines(y = Im(predict(sefAsy, xx, wh=2)), x = xx, col="red")
-#' points(y = Re(as.matrix(sefAsy, wh=2)), x = x)
-#' points(y = Im(as.matrix(sefAsy, wh=2)), x = x, col="red")
+#' ## Second asymmetric eigenfunction:
+#' plot(y=Re(predict(sef, xx, wh=2)), x=xx, type="l", ylab="PMEM_2", xlab="x",
+#'      ylim=c(-0.45,0.35))
+#' lines(y = Im(predict(sef, xx, wh=2)), x=xx, col="red")
+#' points(y = Re(as.matrix(sef, wh=2)), x=x)
+#' points(y = Im(as.matrix(sef, wh=2)), x=x, col="red")
 #' 
-#' plot(y = Re(predict(sefAsy, xx, wh=5)), x = xx, type = "l", ylab = "PMEM_5",
-#'      xlab = "x", ylim=c(-0.45,0.35))
-#' lines(y = Im(predict(sefAsy, xx, wh=5)), x = xx, col="red")
-#' points(y = Re(as.matrix(sefAsy, wh=5)), x = x)
-#' points(y = Im(as.matrix(sefAsy, wh=5)), x = x, col="red")
+#' ## Fifth asymmetric eigenfunction:
+#' plot(y = Re(predict(sef, xx, wh=5)), x=xx, type="l", ylab="PMEM_5", xlab="x",
+#'      ylim=c(-0.45,0.35))
+#' lines(y = Im(predict(sef, xx, wh=5)), x=xx, col="red")
+#' points(y = Re(as.matrix(sef, wh=5)), x=x)
+#' points(y = Im(as.matrix(sef, wh=5)), x=x, col="red")
 #' 
 #' ## A function to display combinations of the real and imaginary parts:
 #' plotAsy <- function(object, xx, wh, a, ylim) {
@@ -168,13 +217,11 @@
 #' }
 #' 
 #' ## Display combinations at an angle of 45° (pMEM_5):
-#' plotAsy(sefAsy, xx, 5, pi/4, ylim=c(-0.45,0.45))
+#' plotAsy(sef, xx, 5, pi/4, ylim=c(-0.45,0.45))
 #' 
 #' ## Display combinations for other angles:
-#' for(i in 0:15) {
-#'   plotAsy(sefAsy, xx, 5, i*pi/8, ylim=c(-0.45,0.45))
-#'   if(is.null(locator(1))) break
-#' }
+#' for(i in 0:15)
+#'   plotAsy(sef, xx, 5, i*pi/8, ylim=c(-0.45,0.45))
 #' 
 #' ## Case 3: two-dimensional symmetrical
 #' 
@@ -198,9 +245,9 @@
 #' cc <- seq(0,1,0.01)
 #' cc <- c(rgb(cc,cc,1),rgb(1,1-cc,1-cc))
 #' 
-#' sefSym2D <- genSEF(x2, genDistMetric(), genDWF("Gaussian",3))
+#' sef <- genSEF(x2, genDistMetric(), genDWF("Gaussian",3))
 #' 
-#' scr <- predict(sefSym2D, ss$coords)
+#' scr <- predict(sef, ss$coords)
 #' 
 #' par(mfrow = c(2,3), mar=0.5*c(1,1,1,1))
 #' 
@@ -212,7 +259,7 @@
 #' 
 #' ## Case 4: two-dimensional asymmetrical
 #' 
-#' sefAsy2D0 <- genSEF(x2, genDistMetric(delta=pi/8), genDWF("Gaussian",1))
+#' sef <- genSEF(x2, genDistMetric(delta=pi/8), genDWF("Gaussian",1))
 #' ## Note: default influence angle is 0 (with respect to the abscissa)
 #' 
 #' ## A function to display combinations of the real and imaginary parts (2D):
@@ -227,39 +274,36 @@
 #' }
 #' 
 #' ## Display combinations at an angle of 22°:
-#' plotAsy2(sefAsy2D0, ss, pi/8)
+#' plotAsy2(sef, ss, pi/8)
 #' 
-#' ## Display combinations at other angles:
-#' for(i in 0:23) {
-#'   plotAsy2(sefAsy2D0, ss, i*pi/12)
-#'   if(is.null(locator(1))) break
-#' }
+#' ## Combinations at other angles:
+#' for(i in 0:23)
+#'   plotAsy2(sef, ss, i*pi/12)
 #' 
 #' ## With an influence of +45° (with respect to the abscissa)
-#' sefAsy2D1 <- genSEF(x2, genDistMetric(delta=pi/8, theta = pi/4),
-#'                     genDWF("Gaussian",1))
+#' sef <- genSEF(x2, genDistMetric(delta=pi/8, theta=pi/4),
+#'               genDWF("Gaussian",1))
 #' 
-#' for(i in 0:23) {
-#'   plotAsy2(sefAsy2D1, ss, i*pi/12)
-#'   if(is.null(locator(1))) break
-#' }
+#' ## Combinations at other angles:
+#' for(i in 0:23)
+#'   plotAsy2(sef, ss, i*pi/12)
 #' 
 #' ## With an influence of +90° (with respect to the abscissa)
-#' sefAsy2D2 <- genSEF(x2, genDistMetric(delta=pi/8, theta = pi/2),
-#'                     genDWF("Gaussian",1))
+#' sef <- genSEF(x2, genDistMetric(delta=pi/8, theta=pi/2),
+#'               genDWF("Gaussian",1))
 #' 
-#' for(i in 0:23) {
-#'   plotAsy2(sefAsy2D2, ss, i*pi/12)
-#'   if(is.null(locator(1))) break
-#' }
+#' ## Combinations at other angles:
+#' for(i in 0:23)
+#'   plotAsy2(sef, ss, i*pi/12)
 #' 
 #' ## With an influence of -45° (with respect to the abscissa)
-#' sefAsy2D3 <- genSEF(x2, genDistMetric(delta=pi/8, theta = -pi/4),
-#'                     genDWF("Gaussian",1))
+#' sef <- genSEF(x2, genDistMetric(delta=pi/8, theta=-pi/4),
+#'               genDWF("Gaussian",1))
 #' 
-#' for(i in 0:23) {
-#'   plotAsy2(sefAsy2D3, ss, i*pi/12)
-#'   if(is.null(locator(1))) break
+#' ## Combinations at other angles:
+#' for(i in 0:23)
+#'   plotAsy2(sef, ss, i*pi/12)
+#' 
 #' }
 #' 
 #' ## Reverting to initial graphical parameters:
@@ -272,7 +316,6 @@
 NULL
 #' 
 #' @describeIn SEMap-class
-#' 
 #' Predictive Moran's Eigenvector Map (pMEM) Generation
 #' 
 #' Generates a predictive spatial eigenvector map (a SEMap-class object).
@@ -285,10 +328,11 @@ genSEF <- function(x, m, f, tol = .Machine$double.eps^0.5) {
   w <- f(d)
   if(complex) {
     g <- .Call("pMEM_centerCplx", PACKAGE="pMEM", w, TRUE)
+    eigen(g$centered, symmetric = FALSE) -> eig
   } else {
     g <- .Call("pMEM_centerReal", PACKAGE="pMEM", w, TRUE)
+    eigen(g$centered, symmetric = TRUE) -> eig
   }
-  eigen(g$centered, symmetric = TRUE) -> eig
   eig$vectors <- eig$vectors[,abs(eig$values) > tol, drop=FALSE]
   eig$values <- eig$values[abs(eig$values) > tol]
   names(eig$values) <- paste("pMEM",1L:length(eig$values),sep="_")
@@ -335,51 +379,43 @@ genSEF <- function(x, m, f, tol = .Machine$double.eps^0.5) {
 }
 #'
 #'@describeIn SEMap-class
-#' 
 #' Print SEMap-class
 #' 
 #' A print method for \code{SEMap-class} objects.
 #' 
 #' @method print SEMap
-#'
 #' @export
 print.SEMap <- function(x, ...)
   x$show()
 #' 
 #' @describeIn SEMap-class
-#' 
 #' An \code{as.data.frame} Method for \code{SEMap-class} Objects
 #' 
 #' A method to extract the spatial eigenvectors from an \code{SEMap-class}
 #' object as a data frame.
 #' 
 #' @method as.data.frame SEMap
-#' 
 #' @export
 as.data.frame.SEMap <- function(x, row.names = NULL, optional = FALSE, ...)
   as.data.frame(x$getSEF(...), row.names = row.names, optional = optional)
 #' 
 #' @describeIn SEMap-class
-#' 
 #' An \code{as.matrix} Method for \code{SEMap-class} Objects
 #' 
 #' A method to extract the spatial eigenvectors from an \code{SEMap-class}
 #' object as a matrix.
 #' 
 #' @method as.matrix SEMap
-#' 
 #' @export
 as.matrix.SEMap <- function(x, ...)
   x$getSEF(...)
 #' 
 #' @describeIn SEMap-class
-#' 
 #' A \code{predict} Method for \code{SEMap-class} Objects
 #' 
 #' A method to obtain predictions from an \code{SEMap-class} object.
 #' 
 #' @method predict SEMap
-#' 
 #' @export
 predict.SEMap <- function(object, newdata, ...)
   object$getPredictor(newdata, ...)

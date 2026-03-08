@@ -79,7 +79,7 @@ data("salmon", package = "pMEM")
 
 ## -----------------------------------------------------------------------------
 library("pMEM")         ## To calculate pMEM
-library("magrittr")     ## For its very handy pipe operateur (%>%)
+library("magrittr")     ## For its very handy pipe operator (%>%)
 library("glmnet")       ## To calculate elastic net regression
 
 ## -----------------------------------------------------------------------------
@@ -178,11 +178,11 @@ objf(
 res
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  sefTrain <- list()  ## For storing the "SEMap" objects.
-#  mseRes <- list()    ## For storing results from function getMinMSE().
-#  sel <- list()       ## For storing selected pMEM eigenfunctions.
-#  lm <- list()        ## For storing the linear models.
-#  prd <- list()       ## For storing the predictions.
+# sefTrain <- list()  ## For storing the "SEMap" objects.
+# mseRes <- list()    ## For storing results from function getMinMSE().
+# sel <- list()       ## For storing selected pMEM eigenfunctions.
+# lm <- list()        ## For storing the linear models.
+# prd <- list()       ## For storing the predictions.
 
 ## ----echo=FALSE---------------------------------------------------------------
 load(file = "Using_pMEM.rda")
@@ -235,7 +235,7 @@ estimateSEF <- function(x, xx, y, yy, lower, upper) {
     {genSEF(
       x = x,
       m = genDistMetric(),
-      f = genDWF(.$fun, .$par[1L], if(length(.$par) > 1) .$par[1L])
+      f = genDWF(.$fun, .$par[1L], if(length(.$par) > 1) .$par[2L])
     )} -> res$sef
   
   ## Return the result list:
@@ -243,14 +243,14 @@ estimateSEF <- function(x, xx, y, yy, lower, upper) {
 }
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  estimateSEF(
-#    x = salmon$Position[train],
-#    xx = salmon$Position[test],
-#    y = salmon[["Depth"]][train],
-#    yy = salmon[["Depth"]][test],
-#    lower = c(20,0.25),
-#    upper = c(1000,1.75)
-#  ) -> sefTrain[["Depth"]]
+# estimateSEF(
+#   x = salmon$Position[train],
+#   xx = salmon$Position[test],
+#   y = salmon[["Depth"]][train],
+#   yy = salmon[["Depth"]][test],
+#   lower = c(20,0.25),
+#   upper = c(1000,1.75)
+# ) -> sefTrain[["Depth"]]
 
 ## -----------------------------------------------------------------------------
 ## Calculate the channel depth model:
@@ -299,15 +299,15 @@ points(x = salmon$Position[test], y = salmon[["Depth"]][test], pch=21, bg="red")
 fc$getCaption("depth")
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## Estimate the most adequate predictive Moran's eigenvector map:
-#  estimateSEF(
-#    x = salmon$Position[train],
-#    xx = salmon$Position[test],
-#    y = salmon[["Velocity"]][train],
-#    yy = salmon[["Velocity"]][test],
-#    lower = c(20,0.25),
-#    upper = c(1000,1.75)
-#  ) -> sefTrain[["Velocity"]]
+# ## Estimate the most adequate predictive Moran's eigenvector map:
+# estimateSEF(
+#   x = salmon$Position[train],
+#   xx = salmon$Position[test],
+#   y = salmon[["Velocity"]][train],
+#   yy = salmon[["Velocity"]][test],
+#   lower = c(20,0.25),
+#   upper = c(1000,1.75)
+# ) -> sefTrain[["Velocity"]]
 
 ## -----------------------------------------------------------------------------
 ## Calculate the current velocity model:
@@ -356,15 +356,15 @@ points(x = salmon$Position[test], y = salmon[["Velocity"]][test], pch=21,
 fc$getCaption("velocity")
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## Estimate the most adequate predictive Moran's eigenvector map:
-#  estimateSEF(
-#    x = salmon$Position[train],
-#    xx = salmon$Position[test],
-#    y = salmon[["Substrate"]][train],
-#    yy = salmon[["Substrate"]][test],
-#    lower = c(20,0.25),
-#    upper = c(1000,1.75)
-#  ) -> sefTrain[["Substrate"]]
+# ## Estimate the most adequate predictive Moran's eigenvector map:
+# estimateSEF(
+#   x = salmon$Position[train],
+#   xx = salmon$Position[test],
+#   y = salmon[["Substrate"]][train],
+#   yy = salmon[["Substrate"]][test],
+#   lower = c(20,0.25),
+#   upper = c(1000,1.75)
+# ) -> sefTrain[["Substrate"]]
 
 ## -----------------------------------------------------------------------------
 ## Calculate the mean substrate grain size model:
@@ -524,16 +524,16 @@ estimateSEF2 <- function(x, xx, y, yy, w, ww, lower, upper) {
 }
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  estimateSEF2(
-#    x = salmon$Position[train],
-#    xx = salmon$Position[test],
-#    y = salmon[["Abundance"]][train],
-#    yy = salmon[["Abundance"]][test],
-#    w = w,
-#    ww = ww,
-#    lower = c(0,0,20,0.25),
-#    upper = c(1,1,1000,1.75)
-#  ) -> sefTrain[["Abundance"]]
+# estimateSEF2(
+#   x = salmon$Position[train],
+#   xx = salmon$Position[test],
+#   y = salmon[["Abundance"]][train],
+#   yy = salmon[["Abundance"]][test],
+#   w = w,
+#   ww = ww,
+#   lower = c(0,0,20,0.25),
+#   upper = c(1,1,1000,1.75)
+# ) -> sefTrain[["Abundance"]]
 
 ## -----------------------------------------------------------------------------
 cbind(w, as.matrix(sefTrain[["Abundance"]]$sef)) %>%

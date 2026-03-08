@@ -8,8 +8,8 @@ bibentry(bibtype = "Article",
                           email = "pierre.legendre@umontreal.ca")),
   journal      = "Methods in Ecology and Evolution",
   year         = "2024",
-  volume       = "In Press",
-  pages        = "XXXX--XXXX",
-  doi          = "10.5281/zenodo.13356457",
+  volume       = "15",
+  pages        = "2129--2140",
+  doi          = "10.1111/2041-210X.14413",
   header       = "To cite pMEM in publications use:"
 )
